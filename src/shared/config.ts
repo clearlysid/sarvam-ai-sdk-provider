@@ -23,6 +23,18 @@ export const SarvamLanguageCodeSchema = z.enum([
     "te-IN",
     "en-IN",
     "gu-IN",
+    "as-IN",
+    "ur-IN",
+    "ne-IN",
+    "kok-IN",
+    "ks-IN",
+    "sd-IN",
+    "sa-IN",
+    "sat-IN",
+    "mni-IN",
+    "brx-IN",
+    "mai-IN",
+    "doi-IN",
 ]);
 
 export type SarvamScriptCode = z.infer<typeof SarvamScriptCodeSchema>

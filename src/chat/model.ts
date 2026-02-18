@@ -153,6 +153,8 @@ export class SarvamChatLanguageModel implements LanguageModelV3 {
           ? { type: "json_object" }
           : undefined,
       reasoning_format: sarvamOptions?.reasoningFormat,
+      reasoning_effort: this.settings.reasoning_effort,
+      wiki_grounding: this.settings.wiki_grounding,
       tools: sarvamTools,
       tool_choice,
     };

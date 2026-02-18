@@ -19,7 +19,8 @@
 		"test": "pnpm test:node && pnpm test:edge",
 		"test:edge": "vitest --config vitest.edge.config.js --run",
 		"test:node": "vitest --config vitest.node.config.js --run",
-		"test:node:watch": "vitest --config vitest.node.config.js"
+		"test:node:watch": "vitest --config vitest.node.config.js",
+		"sync-models": "tsx scripts/sync-models.ts"
 	},
 	"exports": {
 		"./package.json": "./package.json",
@@ -36,7 +37,9 @@
 	"devDependencies": {
 		"@ai-sdk/test-server": "^1.0.3",
 		"@types/node": "20.17.24",
+		"sarvamai": "^1.1.4",
 		"tsup": "^8",
+		"tsx": "^4.21.0",
 		"typescript": "5.6.3",
 		"vitest": "^4.0.18",
 		"zod": "3.25.76"
@@ -50,13 +53,13 @@
 	"publishConfig": {
 		"access": "public"
 	},
-	"homepage": "https://ai-sdk.dev/docs",
+	"homepage": "https://docs.sarvam.ai",
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/rajatsandeepsen/sarvam-ai-sdk.git"
+		"url": "git+https://github.com/clearlysid/sarvam-ai-sdk-provider.git"
 	},
 	"bugs": {
-		"url": "https://github.com/rajatsandeepsen/sarvam-ai-sdk/issues"
+		"url": "https://github.com/clearlysid/sarvam-ai-sdk-provider/issues"
 	},
 	"keywords": [
 		"ai",

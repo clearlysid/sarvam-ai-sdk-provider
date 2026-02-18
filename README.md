@@ -1,6 +1,6 @@
 # AI SDK - Sarvam Provider
 
-The **[Sarvam provider](https://ai-sdk.dev/providers/ai-sdk-providers/sarvam)** for the [AI SDK](https://ai-sdk.dev/docs)
+The **[Sarvam provider](https://ai-sdk.dev/providers/community-providers/sarvam)** for the [AI SDK](https://ai-sdk.dev/docs)
 contains language model support for the Sarvam chat completion, Text-to-Speech and Speech-to-Text APIs.
 
 ## Setup
@@ -200,4 +200,4 @@ console.log(object);
 
 ## Documentation
 
-Please check out the **[Sarvam provider documentation](https://ai-sdk.dev/providers/ai-sdk-providers/sarvam)** and **[Sarvam API documentation](https://docs.sarvam.ai)** for more information.
+Please check out the **[Sarvam provider documentation](https://ai-sdk.dev/providers/community-providers/sarvam)** and **[Sarvam API documentation](https://docs.sarvam.ai)** for more information.

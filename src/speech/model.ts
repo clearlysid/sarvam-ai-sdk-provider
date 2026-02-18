@@ -13,7 +13,7 @@ import {
     SpeakerSchema,
     type SarvamSpeechModelId,
 } from "./settings";
-import type { SarvamSpeechAPITypes } from "../shared/api-types";
+
 import { z } from "zod";
 
 interface SarvamSpeechModelConfig extends SarvamConfig {
@@ -66,13 +66,13 @@ export class SarvamSpeechModel implements SpeechModelV3 {
             }
 
             switch (this.modelId) {
-                case "bulbul:v1":
-                    return "meera";
                 case "bulbul:v2":
                     return "manisha";
+                case "bulbul:v3":
+                    return "anushka";
             }
 
-            return "meera";
+            return "anushka";
         };
 
         const requestBody: Record<string, unknown> = {
@@ -99,11 +99,12 @@ export class SarvamSpeechModel implements SpeechModelV3 {
         }
 
         if (sarvamOptions) {
-            const speechModelOptions: SarvamSpeechAPITypes = {};
-
-            for (const key in speechModelOptions) {
-                const value =
-                    speechModelOptions[key as keyof SarvamSpeechAPITypes];
+            const optionalKeys = [
+                "pitch", "pace", "loudness", "speech_sample_rate",
+                "enable_preprocessing", "output_audio_codec", "temperature",
+            ] as const;
+            for (const key of optionalKeys) {
+                const value = sarvamOptions[key];
                 if (value !== undefined) {
                     requestBody[key] = value;
                 }

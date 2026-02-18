@@ -1,6 +1,6 @@
 import {
-  TranscriptionModelV1,
-  TranscriptionModelV1CallWarning,
+  TranscriptionModelV3,
+  SharedV3Warning,
 } from "@ai-sdk/provider";
 import {
   combineHeaders,
@@ -19,8 +19,8 @@ interface SarvamSpeechTranslationModelConfig extends SarvamConfig {
   };
 }
 
-export class SarvamSpeechTranslationModel implements TranscriptionModelV1 {
-  readonly specificationVersion = "v1";
+export class SarvamSpeechTranslationModel implements TranscriptionModelV3 {
+  readonly specificationVersion = "v3";
 
   constructor(
     readonly modelId: SarvamSpeechTranslationModelId,
@@ -34,9 +34,8 @@ export class SarvamSpeechTranslationModel implements TranscriptionModelV1 {
   private getArgs({
     audio,
     mediaType,
-    providerOptions,
-  }: Parameters<TranscriptionModelV1["doGenerate"]>[0]) {
-    const warnings: TranscriptionModelV1CallWarning[] = [];
+  }: Parameters<TranscriptionModelV3["doGenerate"]>[0]) {
+    const warnings: SharedV3Warning[] = [];
 
     const formData = new FormData();
     const blob =
@@ -52,8 +51,8 @@ export class SarvamSpeechTranslationModel implements TranscriptionModelV1 {
   }
 
   async doGenerate(
-    options: Parameters<TranscriptionModelV1["doGenerate"]>[0],
-  ): Promise<Awaited<ReturnType<TranscriptionModelV1["doGenerate"]>>> {
+    options: Parameters<TranscriptionModelV3["doGenerate"]>[0],
+  ): Promise<Awaited<ReturnType<TranscriptionModelV3["doGenerate"]>>> {
     const currentDate = this.config._internal?.currentDate?.() ?? new Date();
     const { formData, warnings } = this.getArgs(options);
 
@@ -96,13 +95,6 @@ const sarvamTranscriptionResponseSchema = z.object({
   request_id: z.string().nullable(),
   transcript: z.string(),
   language_code: z.string().nullable(),
-  // timestamps: z
-  //   .object({
-  //     end_time_seconds: z.array(z.number()),
-  //     start_time_seconds: z.array(z.number()),
-  //     words: z.array(z.string()),
-  //   })
-  //   .optional(),
   diarized_transcript: z
     .object({
       entries: z.array(

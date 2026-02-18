@@ -1,12 +1,11 @@
 import {
-  LanguageModelV1Prompt,
+  LanguageModelV3Prompt,
   UnsupportedFunctionalityError,
 } from "@ai-sdk/provider";
-import { convertUint8ArrayToBase64 } from "@ai-sdk/provider-utils";
 import { SarvamChatPrompt } from "./sarvam-api-types";
 
 export function convertToSarvamChatMessages(
-  prompt: LanguageModelV1Prompt,
+  prompt: LanguageModelV3Prompt,
   fakeToolSystemPrompt?: string,
 ): SarvamChatPrompt {
   const messages: SarvamChatPrompt = [];
@@ -34,23 +33,33 @@ export function convertToSarvamChatMessages(
               case "text": {
                 return { type: "text", text: part.text };
               }
-              case "image": {
+              case "file": {
+                if (!part.mediaType.startsWith("image/")) {
+                  throw new UnsupportedFunctionalityError({
+                    functionality: "Non-image file content parts in user messages",
+                  });
+                }
+
+                if (part.data instanceof URL) {
+                  return {
+                    type: "image_url",
+                    image_url: {
+                      url: part.data.toString(),
+                    },
+                  };
+                }
+
+                const base64 =
+                  typeof part.data === "string"
+                    ? part.data
+                    : Buffer.from(part.data).toString("base64");
+
                 return {
                   type: "image_url",
                   image_url: {
-                    url:
-                      part.image instanceof URL
-                        ? part.image.toString()
-                        : `data:${
-                            part.mimeType ?? "image/jpeg"
-                          };base64,${convertUint8ArrayToBase64(part.image)}`,
+                    url: `data:${part.mediaType};base64,${base64}`,
                   },
                 };
-              }
-              case "file": {
-                throw new UnsupportedFunctionalityError({
-                  functionality: "File content parts in user messages",
-                });
               }
             }
           }),
@@ -79,7 +88,7 @@ export function convertToSarvamChatMessages(
                 type: "function",
                 function: {
                   name: part.toolName,
-                  arguments: JSON.stringify(part.args),
+                  arguments: JSON.stringify(part.input),
                 },
               });
               break;
@@ -98,10 +107,29 @@ export function convertToSarvamChatMessages(
 
       case "tool": {
         for (const toolResponse of content) {
+          if (toolResponse.type !== "tool-result") continue;
+          const output = toolResponse.output;
+          let toolContent: string;
+          switch (output.type) {
+            case "text":
+            case "error-text":
+              toolContent = output.value;
+              break;
+            case "json":
+            case "error-json":
+              toolContent = JSON.stringify(output.value);
+              break;
+            case "execution-denied":
+              toolContent = output.reason ?? "Tool execution denied";
+              break;
+            default:
+              toolContent = JSON.stringify(output);
+              break;
+          }
           messages.push({
             role: "tool",
             tool_call_id: toolResponse.toolCallId,
-            content: JSON.stringify(toolResponse.result),
+            content: toolContent,
           });
         }
         break;

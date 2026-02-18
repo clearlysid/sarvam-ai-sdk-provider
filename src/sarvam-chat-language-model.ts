@@ -1,12 +1,12 @@
 import {
   InvalidResponseDataError,
-  LanguageModelV1,
-  LanguageModelV1CallWarning,
-  LanguageModelV1FinishReason,
-  LanguageModelV1FunctionToolCall,
-  LanguageModelV1Prompt,
-  LanguageModelV1ProviderMetadata,
-  LanguageModelV1StreamPart,
+  LanguageModelV3,
+  LanguageModelV3CallOptions,
+  LanguageModelV3Content,
+  LanguageModelV3FinishReason,
+  LanguageModelV3StreamPart,
+  LanguageModelV3Usage,
+  SharedV3Warning,
 } from "@ai-sdk/provider";
 import {
   FetchFunction,
@@ -43,11 +43,10 @@ type SarvamChatConfig = {
   fetch?: FetchFunction;
 };
 
-export class SarvamChatLanguageModel implements LanguageModelV1 {
-  readonly specificationVersion = "v1";
+export class SarvamChatLanguageModel implements LanguageModelV3 {
+  readonly specificationVersion = "v3";
 
-  readonly supportsStructuredOutputs = false;
-  readonly defaultObjectGenerationMode = "json";
+  readonly supportedUrls: Record<string, RegExp[]> = {};
 
   readonly modelId: SarvamChatModelId;
   readonly settings: SarvamChatSettings;
@@ -68,38 +67,28 @@ export class SarvamChatLanguageModel implements LanguageModelV1 {
     return this.config.provider;
   }
 
-  get supportsImageUrls(): boolean {
-    // image urls can be sent if downloadImages is disabled (default):
-    return !this.settings.downloadImages;
-  }
+  private async getArgs(
+    options: LanguageModelV3CallOptions & { stream: boolean },
+  ) {
+    const {
+      prompt,
+      maxOutputTokens,
+      temperature,
+      topP,
+      topK,
+      frequencyPenalty,
+      presencePenalty,
+      stopSequences,
+      responseFormat,
+      seed,
+      tools,
+      toolChoice,
+      providerOptions,
+      stream,
+    } = options;
 
-  private async getArgs({
-    mode,
-    prompt,
-    maxTokens,
-    temperature,
-    topP,
-    topK,
-    frequencyPenalty,
-    presencePenalty,
-    stopSequences,
-    responseFormat,
-    seed,
-    stream,
-    providerMetadata,
-  }: Parameters<LanguageModelV1["doGenerate"]>[0] & {
-    stream: boolean;
-  }) {
-    const type = mode.type;
-    const simulate = this.settings.simulate
-
-    if (type === "object-json" && simulate === "tool-calling")
-        throw new Error('Use { simulate: "json-object" } with generateObject()')
-
-    if (type === "regular" && simulate === "json-object")
-        throw new Error('Use { simulate: "tool-calling" } with generateText()')
-
-    const warnings: LanguageModelV1CallWarning[] = [];
+    const simulate = this.settings.simulate;
+    const warnings: SharedV3Warning[] = [];
 
     if (stream) {
       warnings.push({
@@ -110,8 +99,8 @@ export class SarvamChatLanguageModel implements LanguageModelV1 {
 
     if (topK != null) {
       warnings.push({
-        type: "unsupported-setting",
-        setting: "topK",
+        type: "unsupported",
+        feature: "topK",
       });
     }
 
@@ -121,124 +110,62 @@ export class SarvamChatLanguageModel implements LanguageModelV1 {
       responseFormat.schema != null
     ) {
       warnings.push({
-        type: "unsupported-setting",
-        setting: "responseFormat",
+        type: "unsupported",
+        feature: "responseFormat",
         details: "JSON response format schema is not supported",
       });
     }
 
-    const sarvamOptions = parseProviderOptions({
+    const sarvamOptions = await parseProviderOptions({
       provider: "sarvam",
-      providerOptions: providerMetadata,
+      providerOptions,
       schema: z.object({
         reasoningFormat: z.enum(["parsed", "raw", "hidden"]).nullish(),
       }),
     });
 
-    const baseArgs = (
-      prompt: LanguageModelV1Prompt,
-      extraSystemPrompt?: string,
-    ) => ({
-      // model id:
-      model: this.modelId,
+    const { tools: sarvamTools, tool_choice, toolWarnings } = prepareTools({
+      tools,
+      toolChoice,
+    });
 
-      // model specific settings:
+    const extraSystemPrompt =
+      sarvamTools && simulate === "tool-calling"
+        ? simulateToolCalling(sarvamTools)
+        : responseFormat?.type === "json" && simulate === "json-object"
+          ? simulateJsonSchema()
+          : undefined;
+
+    const body = {
+      model: this.modelId,
+      messages: convertToSarvamChatMessages(prompt, extraSystemPrompt),
       user: this.settings.user,
       parallel_tool_calls: this.settings.parallelToolCalls,
-
-      // standardized settings:
-      max_tokens: maxTokens,
+      max_tokens: maxOutputTokens,
       temperature,
       top_p: topP,
       frequency_penalty: frequencyPenalty,
       presence_penalty: presencePenalty,
       stop: stopSequences,
       seed,
-
-      // response format:
       response_format:
-        // json object response format is not supported for streaming:
         stream === false && responseFormat?.type === "json"
           ? { type: "json_object" }
           : undefined,
-
-      // provider options:
       reasoning_format: sarvamOptions?.reasoningFormat,
+      tools: sarvamTools,
+      tool_choice,
+    };
 
-      // messages:
-      messages: convertToSarvamChatMessages(prompt, extraSystemPrompt),
-    });
-
-    switch (type) {
-      case "regular": {
-        const { tools, tool_choice, toolWarnings } = prepareTools({
-          mode,
-        });
-
-        const extraSystemPrompt =
-          tools && simulate === "tool-calling"
-            ? await simulateToolCalling(tools)
-            : undefined;
-
-        return {
-          args: {
-            ...baseArgs(prompt, extraSystemPrompt),
-            tools,
-            tool_choice,
-          },
-          warnings: [...warnings, ...toolWarnings],
-        };
-      }
-
-      case "object-json": {
-        const extraSystemPrompt = simulate === "json-object"
-          ? simulateJsonSchema()
-          : undefined;
-
-        return {
-          args: {
-            ...baseArgs(prompt, extraSystemPrompt),
-            response_format:
-              // json object response format is not supported for streaming:
-              stream === false ? { type: "json_object" } : undefined,
-          },
-          warnings,
-        };
-      }
-
-      case "object-tool": {
-        return {
-          args: {
-            ...baseArgs(prompt),
-            tool_choice: {
-              type: "function",
-              function: { name: mode.tool.name },
-            },
-            tools: [
-              {
-                type: "function",
-                function: {
-                  name: mode.tool.name,
-                  description: mode.tool.description,
-                  parameters: mode.tool.parameters,
-                },
-              },
-            ],
-          },
-          warnings,
-        };
-      }
-
-      default: {
-        const _exhaustiveCheck: never = type;
-        throw new Error(`Unsupported type: ${_exhaustiveCheck}`);
-      }
-    }
+    return {
+      args: body,
+      warnings: [...warnings, ...toolWarnings],
+    };
   }
 
   async doGenerate(
-    options: Parameters<LanguageModelV1["doGenerate"]>[0],
-  ): Promise<Awaited<ReturnType<LanguageModelV1["doGenerate"]>>> {
+    options: LanguageModelV3CallOptions,
+  ) {
     const { args, warnings } = await this.getArgs({
       ...options,
       stream: false,
@@ -249,7 +176,6 @@ export class SarvamChatLanguageModel implements LanguageModelV1 {
     const {
       responseHeaders,
       value: response,
-      rawValue: rawResponse,
     } = await postJsonToApi({
       url: this.config.url({
         path: "/chat/completions",
@@ -265,26 +191,30 @@ export class SarvamChatLanguageModel implements LanguageModelV1 {
       fetch: this.config.fetch,
     });
 
-    const { messages: rawPrompt, ...rawSettings } = args;
     const choice = response.choices[0];
 
     let text = choice.message.content ?? undefined;
+    const content: LanguageModelV3Content[] = [];
+
+    if (choice.message.reasoning) {
+      content.push({ type: "reasoning", text: choice.message.reasoning });
+    }
 
     let toolCalls = choice.message.tool_calls?.map((toolCall) => ({
-      toolCallType: "function",
+      type: "tool-call" as const,
       toolCallId: toolCall.id ?? generateId(),
       toolName: toolCall.function.name,
-      args: toolCall.function.arguments!,
-    })) as LanguageModelV1FunctionToolCall[] | undefined;
+      input: toolCall.function.arguments!,
+    }));
 
     // simulate tool calling through prompt engineering
     if (this.settings.simulate === "tool-calling") {
         if (text && text.length !== 0) {
           const jsonObject = parseJSON(text);
           if (jsonObject) {
-            const newTools = extractToolCallData(jsonObject);
-            if (newTools) {
-              toolCalls = [newTools];
+            const newTool = extractToolCallData(jsonObject);
+            if (newTool) {
+              toolCalls = [{ type: "tool-call", ...newTool }];
               text = undefined;
             }
           }
@@ -296,32 +226,49 @@ export class SarvamChatLanguageModel implements LanguageModelV1 {
       if (text && text.length !== 0) {
         const jsonObject = parseJSON(text);
         if (jsonObject) {
-          const newTools = extractToolCallData(jsonObject);
             text = JSON.stringify(jsonObject);
         }
       }
     }
 
+    if (text) {
+      content.push({ type: "text", text });
+    }
+
+    if (toolCalls) {
+      for (const tc of toolCalls) {
+        content.push(tc);
+      }
+    }
+
     return {
-      text,
-      toolCalls,
-      reasoning: choice.message.reasoning ?? undefined,
+      content,
       finishReason: mapSarvamFinishReason(choice.finish_reason),
       usage: {
-        promptTokens: response.usage?.prompt_tokens ?? NaN,
-        completionTokens: response.usage?.completion_tokens ?? NaN,
-      },
-      rawCall: { rawPrompt, rawSettings },
-      rawResponse: { headers: responseHeaders, body: rawResponse },
-      response: getResponseMetadata(response),
-      warnings,
+        inputTokens: {
+          total: response.usage?.prompt_tokens ?? undefined,
+          noCache: undefined,
+          cacheRead: undefined,
+          cacheWrite: undefined,
+        },
+        outputTokens: {
+          total: response.usage?.completion_tokens ?? undefined,
+          text: undefined,
+          reasoning: undefined,
+        },
+      } satisfies LanguageModelV3Usage,
       request: { body },
+      response: {
+        ...getResponseMetadata(response),
+        headers: responseHeaders,
+      },
+      warnings,
     };
   }
 
   async doStream(
-    options: Parameters<LanguageModelV1["doStream"]>[0],
-  ): Promise<Awaited<ReturnType<LanguageModelV1["doStream"]>>> {
+    options: LanguageModelV3CallOptions,
+  ) {
     const { args, warnings } = await this.getArgs({ ...options, stream: true });
 
     const body = JSON.stringify({ ...args, stream: true });
@@ -344,8 +291,6 @@ export class SarvamChatLanguageModel implements LanguageModelV1 {
       fetch: this.config.fetch,
     });
 
-    const { messages: rawPrompt, ...rawSettings } = args;
-
     const toolCalls: Array<{
       id: string;
       type: "function";
@@ -356,27 +301,26 @@ export class SarvamChatLanguageModel implements LanguageModelV1 {
       hasFinished: boolean;
     }> = [];
 
-    let finishReason: LanguageModelV1FinishReason = "unknown";
-    let usage: {
-      promptTokens: number | undefined;
-      completionTokens: number | undefined;
-    } = {
-      promptTokens: undefined,
-      completionTokens: undefined,
+    let finishReason: LanguageModelV3FinishReason = { unified: "other", raw: undefined };
+    let usage: LanguageModelV3Usage = {
+      inputTokens: { total: undefined, noCache: undefined, cacheRead: undefined, cacheWrite: undefined },
+      outputTokens: { total: undefined, text: undefined, reasoning: undefined },
     };
     let isFirstChunk = true;
+    let textStarted = false;
+    let reasoningStarted = false;
+    const textId = generateId();
+    const reasoningId = generateId();
 
-    let providerMetadata: LanguageModelV1ProviderMetadata | undefined;
     return {
       stream: response.pipeThrough(
         new TransformStream<
           ParseResult<z.infer<typeof sarvamChatChunkSchema>>,
-          LanguageModelV1StreamPart
+          LanguageModelV3StreamPart
         >({
           transform(chunk, controller) {
-            // handle failed chunk parsing / validation:
             if (!chunk.success) {
-              finishReason = "error";
+              finishReason = { unified: "error", raw: undefined };
               controller.enqueue({
                 type: "error",
                 error: chunk.error,
@@ -386,9 +330,8 @@ export class SarvamChatLanguageModel implements LanguageModelV1 {
 
             const value = chunk.value;
 
-            // handle error chunks:
             if ("error" in value) {
-              finishReason = "error";
+              finishReason = { unified: "error", raw: undefined };
               controller.enqueue({
                 type: "error",
                 error: value.error,
@@ -400,6 +343,11 @@ export class SarvamChatLanguageModel implements LanguageModelV1 {
               isFirstChunk = false;
 
               controller.enqueue({
+                type: "stream-start",
+                warnings,
+              });
+
+              controller.enqueue({
                 type: "response-metadata",
                 ...getResponseMetadata(value),
               });
@@ -407,9 +355,17 @@ export class SarvamChatLanguageModel implements LanguageModelV1 {
 
             if (value.x_sarvam?.usage != null) {
               usage = {
-                promptTokens: value.x_sarvam.usage.prompt_tokens ?? undefined,
-                completionTokens:
-                  value.x_sarvam.usage.completion_tokens ?? undefined,
+                inputTokens: {
+                  total: value.x_sarvam.usage.prompt_tokens ?? undefined,
+                  noCache: undefined,
+                  cacheRead: undefined,
+                  cacheWrite: undefined,
+                },
+                outputTokens: {
+                  total: value.x_sarvam.usage.completion_tokens ?? undefined,
+                  text: undefined,
+                  reasoning: undefined,
+                },
               };
             }
 
@@ -426,16 +382,26 @@ export class SarvamChatLanguageModel implements LanguageModelV1 {
             const delta = choice.delta;
 
             if (delta.reasoning != null && delta.reasoning.length > 0) {
+              if (!reasoningStarted) {
+                reasoningStarted = true;
+                controller.enqueue({ type: "reasoning-start", id: reasoningId });
+              }
               controller.enqueue({
-                type: "reasoning",
-                textDelta: delta.reasoning,
+                type: "reasoning-delta",
+                id: reasoningId,
+                delta: delta.reasoning,
               });
             }
 
             if (delta.content != null && delta.content.length > 0) {
+              if (!textStarted) {
+                textStarted = true;
+                controller.enqueue({ type: "text-start", id: textId });
+              }
               controller.enqueue({
                 type: "text-delta",
-                textDelta: delta.content,
+                id: textId,
+                delta: delta.content,
               });
             }
 
@@ -477,39 +443,37 @@ export class SarvamChatLanguageModel implements LanguageModelV1 {
 
                   const toolCall = toolCalls[index];
 
-                  if (
-                    toolCall.function?.name != null &&
-                    toolCall.function?.arguments != null
-                  ) {
-                    // send delta if the argument text has already started:
-                    if (toolCall.function.arguments.length > 0) {
-                      controller.enqueue({
-                        type: "tool-call-delta",
-                        toolCallType: "function",
-                        toolCallId: toolCall.id,
-                        toolName: toolCall.function.name,
-                        argsTextDelta: toolCall.function.arguments,
-                      });
-                    }
+                  controller.enqueue({
+                    type: "tool-input-start",
+                    id: toolCall.id,
+                    toolName: toolCall.function.name,
+                  });
 
-                    // check if tool call is complete
-                    // (some providers send the full tool call in one chunk):
-                    if (isParsableJson(toolCall.function.arguments)) {
-                      controller.enqueue({
-                        type: "tool-call",
-                        toolCallType: "function",
-                        toolCallId: toolCall.id ?? generateId(),
-                        toolName: toolCall.function.name,
-                        args: toolCall.function.arguments,
-                      });
-                      toolCall.hasFinished = true;
-                    }
+                  if (toolCall.function.arguments.length > 0) {
+                    controller.enqueue({
+                      type: "tool-input-delta",
+                      id: toolCall.id,
+                      delta: toolCall.function.arguments,
+                    });
+                  }
+
+                  if (isParsableJson(toolCall.function.arguments)) {
+                    controller.enqueue({
+                      type: "tool-input-end",
+                      id: toolCall.id,
+                    });
+                    controller.enqueue({
+                      type: "tool-call",
+                      toolCallId: toolCall.id,
+                      toolName: toolCall.function.name,
+                      input: toolCall.function.arguments,
+                    });
+                    toolCall.hasFinished = true;
                   }
 
                   continue;
                 }
 
-                // existing tool call, merge if not finished
                 const toolCall = toolCalls[index];
 
                 if (toolCall.hasFinished) {
@@ -521,27 +485,26 @@ export class SarvamChatLanguageModel implements LanguageModelV1 {
                     toolCallDelta.function?.arguments ?? "";
                 }
 
-                // send delta
                 controller.enqueue({
-                  type: "tool-call-delta",
-                  toolCallType: "function",
-                  toolCallId: toolCall.id,
-                  toolName: toolCall.function.name,
-                  argsTextDelta: toolCallDelta.function.arguments ?? "",
+                  type: "tool-input-delta",
+                  id: toolCall.id,
+                  delta: toolCallDelta.function.arguments ?? "",
                 });
 
-                // check if tool call is complete
                 if (
                   toolCall.function?.name != null &&
                   toolCall.function?.arguments != null &&
                   isParsableJson(toolCall.function.arguments)
                 ) {
                   controller.enqueue({
+                    type: "tool-input-end",
+                    id: toolCall.id,
+                  });
+                  controller.enqueue({
                     type: "tool-call",
-                    toolCallType: "function",
-                    toolCallId: toolCall.id ?? generateId(),
+                    toolCallId: toolCall.id,
                     toolName: toolCall.function.name,
-                    args: toolCall.function.arguments,
+                    input: toolCall.function.arguments,
                   });
                   toolCall.hasFinished = true;
                 }
@@ -550,22 +513,23 @@ export class SarvamChatLanguageModel implements LanguageModelV1 {
           },
 
           flush(controller) {
+            if (reasoningStarted) {
+              controller.enqueue({ type: "reasoning-end", id: reasoningId });
+            }
+            if (textStarted) {
+              controller.enqueue({ type: "text-end", id: textId });
+            }
+
             controller.enqueue({
               type: "finish",
               finishReason,
-              usage: {
-                promptTokens: usage.promptTokens ?? NaN,
-                completionTokens: usage.completionTokens ?? NaN,
-              },
-              ...(providerMetadata != null ? { providerMetadata } : {}),
+              usage,
             });
           },
         }),
       ),
-      rawCall: { rawPrompt, rawSettings },
-      rawResponse: { headers: responseHeaders },
-      warnings,
       request: { body },
+      response: { headers: responseHeaders },
     };
   }
 }

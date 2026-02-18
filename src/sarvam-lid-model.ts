@@ -1,6 +1,9 @@
 import {
-    LanguageModelV1,
-    LanguageModelV1CallWarning
+    LanguageModelV3,
+    LanguageModelV3CallOptions,
+    LanguageModelV3Content,
+    LanguageModelV3Usage,
+    SharedV3Warning,
 } from "@ai-sdk/provider";
 import {
     FetchFunction,
@@ -11,6 +14,7 @@ import {
 import { z } from "zod";
 import { convertToSarvamChatMessages } from "./convert-to-sarvam-chat-messages";
 import { SarvamLanguageCodeSchema, SarvamScriptCodeSchema } from "./sarvam-config";
+import { mapSarvamFinishReason } from "./map-sarvam-finish-reason";
 import {
     sarvamFailedResponseHandler
 } from "./sarvam-error";
@@ -22,11 +26,10 @@ type SarvamLidConfig = {
   fetch?: FetchFunction;
 };
 
-export class SarvamLidModel implements LanguageModelV1 {
-  readonly specificationVersion = "v1";
+export class SarvamLidModel implements LanguageModelV3 {
+  readonly specificationVersion = "v3";
 
-  readonly supportsStructuredOutputs = false;
-  readonly defaultObjectGenerationMode = "json";
+  readonly supportedUrls: Record<string, RegExp[]> = {};
 
   readonly modelId: "unknown";
 
@@ -43,25 +46,12 @@ export class SarvamLidModel implements LanguageModelV1 {
     return this.config.provider;
   }
 
-  get supportsImageUrls(): boolean {
-    // image urls can be sent if downloadImages is disabled (default):
-    return false;
-  }
-
   private getArgs({
-    mode,
     prompt,
-  }: Parameters<LanguageModelV1["doGenerate"]>[0] & {
+  }: LanguageModelV3CallOptions & {
     stream: boolean;
   }) {
-    const type = mode.type;
-
-    const warnings: LanguageModelV1CallWarning[] = [];
-
-    if (type !== "regular") {
-      const _exhaustiveCheck = type;
-      throw new Error(`Unsupported type: ${_exhaustiveCheck}`);
-    }
+    const warnings: SharedV3Warning[] = [];
 
     const messages = convertToSarvamChatMessages(prompt);
 
@@ -78,9 +68,9 @@ export class SarvamLidModel implements LanguageModelV1 {
   }
 
   async doGenerate(
-    options: Parameters<LanguageModelV1["doGenerate"]>[0],
-  ): Promise<Awaited<ReturnType<LanguageModelV1["doGenerate"]>>> {
-    const { args, warnings, messages } = this.getArgs({
+    options: LanguageModelV3CallOptions,
+  ) {
+    const { args, warnings } = this.getArgs({
       ...options,
       stream: false,
     });
@@ -90,7 +80,6 @@ export class SarvamLidModel implements LanguageModelV1 {
     const {
       responseHeaders,
       value: response,
-      rawValue: rawResponse,
     } = await postJsonToApi({
       url: this.config.url({
         path: "/text-lid",
@@ -105,31 +94,31 @@ export class SarvamLidModel implements LanguageModelV1 {
       fetch: this.config.fetch,
     });
 
-    const { input: rawPrompt, ...rawSettings } = args;
-
     const text = response.language_code ?? undefined;
+    const content: LanguageModelV3Content[] = [];
+    if (text) {
+      content.push({ type: "text", text });
+    }
 
     return {
-      text,
-      toolCalls: undefined,
-      reasoning: undefined,
-      finishReason: "unknown",
+      content,
+      finishReason: mapSarvamFinishReason(undefined),
       usage: {
-        promptTokens: NaN,
-        completionTokens: NaN,
-      },
-      rawCall: { rawPrompt, rawSettings },
-      rawResponse: { headers: responseHeaders, body: rawResponse },
-      response: undefined,
-      warnings,
+        inputTokens: { total: undefined, noCache: undefined, cacheRead: undefined, cacheWrite: undefined },
+        outputTokens: { total: undefined, text: undefined, reasoning: undefined },
+      } satisfies LanguageModelV3Usage,
       request: { body },
+      response: {
+        headers: responseHeaders,
+      },
+      warnings,
     };
   }
 
   async doStream(
-    options: Parameters<LanguageModelV1["doStream"]>[0],
-  ): Promise<Awaited<ReturnType<LanguageModelV1["doStream"]>>> {
-    throw new Error("Language Identification feature doesn't streaming yet");
+    _options: LanguageModelV3CallOptions,
+  ): Promise<never> {
+    throw new Error("Language Identification feature doesn't support streaming yet");
   }
 }
 

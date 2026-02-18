@@ -1,60 +1,62 @@
-import { createTestServer } from "@ai-sdk/provider-utils/test";
+import { createTestServer } from "@ai-sdk/test-server/with-vitest";
 import { SarvamSpeechModel } from "./sarvam-speech-model";
 import { createSarvam } from "./sarvam-provider";
 
 const provider = createSarvam({ apiKey: "test-api-key" });
-const model = provider.speech("tts-1");
+const model = provider.speech("bulbul:v2", "hi-IN");
 
 const server = createTestServer({
-    "https://api.sarvam.com/v1/audio/speech": {},
+    "https://api.sarvam.ai/text-to-speech": {},
 });
 
 describe("doGenerate", () => {
-    function prepareAudioResponse({
+    function prepareJsonResponse({
         headers,
-        format = "mp3",
+        audios = ["base64audiodata"],
+        request_id = "req-123",
     }: {
         headers?: Record<string, string>;
-        format?: "mp3" | "opus" | "aac" | "flac" | "wav" | "pcm";
+        audios?: string[];
+        request_id?: string;
     } = {}) {
-        const audioBuffer = new Uint8Array(100); // Mock audio data
-        server.urls["https://api.sarvam.com/v1/audio/speech"].response = {
-            type: "binary",
+        server.urls["https://api.sarvam.ai/text-to-speech"].response = {
+            type: "json-value",
             headers: {
-                "content-type": `audio/${format}`,
+                "content-type": "application/json",
                 ...headers,
             },
-            body: Buffer.from(audioBuffer),
+            body: {
+                request_id,
+                audios,
+            },
         };
-        return audioBuffer;
     }
 
-    it("should pass the model and text", async () => {
-        prepareAudioResponse();
+    it("should pass the model, text, and language code", async () => {
+        prepareJsonResponse();
 
         await model.doGenerate({
             text: "Hello from the AI SDK!",
         });
 
-        expect(await server.calls[0].requestBody).toMatchObject({
-            model: "tts-1",
-            input: "Hello from the AI SDK!",
+        expect(await server.calls[0].requestBodyJson).toMatchObject({
+            model: "bulbul:v2",
+            text: "Hello from the AI SDK!",
+            target_language_code: "hi-IN",
         });
     });
 
     it("should pass headers", async () => {
-        prepareAudioResponse();
+        prepareJsonResponse();
 
         const provider = createSarvam({
             apiKey: "test-api-key",
-            organization: "test-organization",
-            project: "test-project",
             headers: {
                 "Custom-Provider-Header": "provider-header-value",
             },
         });
 
-        await provider.speech("tts-1").doGenerate({
+        await provider.speech("bulbul:v2", "hi-IN").doGenerate({
             text: "Hello from the AI SDK!",
             headers: {
                 "Custom-Request-Header": "request-header-value",
@@ -66,50 +68,21 @@ describe("doGenerate", () => {
             "content-type": "application/json",
             "custom-provider-header": "provider-header-value",
             "custom-request-header": "request-header-value",
-            "sarvam-organization": "test-organization",
-            "sarvam-project": "test-project",
         });
     });
 
-    it("should pass options", async () => {
-        prepareAudioResponse();
-
-        await model.doGenerate({
-            text: "Hello from the AI SDK!",
-            voice: "nova",
-            outputFormat: "opus",
-            speed: 1.5,
-        });
-
-        expect(await server.calls[0].requestBody).toMatchObject({
-            model: "tts-1",
-            input: "Hello from the AI SDK!",
-            voice: "nova",
-            speed: 1.5,
-            response_format: "opus",
-        });
-    });
-
-    it("should return audio data with correct content type", async () => {
-        const audio = new Uint8Array(100); // Mock audio data
-        prepareAudioResponse({
-            format: "opus",
-            headers: {
-                "x-request-id": "test-request-id",
-                "x-ratelimit-remaining": "123",
-            },
-        });
+    it("should return audio data from response", async () => {
+        prepareJsonResponse({ audios: ["dGVzdGF1ZGlv"] });
 
         const result = await model.doGenerate({
             text: "Hello from the AI SDK!",
-            outputFormat: "opus",
         });
 
-        expect(result.audio).toStrictEqual(audio);
+        expect(result.audio).toBe("dGVzdGF1ZGlv");
     });
 
     it("should include response data with timestamp, modelId and headers", async () => {
-        prepareAudioResponse({
+        prepareJsonResponse({
             headers: {
                 "x-request-id": "test-request-id",
                 "x-ratelimit-remaining": "123",
@@ -117,9 +90,9 @@ describe("doGenerate", () => {
         });
 
         const testDate = new Date(0);
-        const customModel = new SarvamSpeechModel("tts-1", {
+        const customModel = new SarvamSpeechModel("bulbul:v2", "hi-IN", {
             provider: "test-provider",
-            url: () => "https://api.sarvam.com/v1/audio/speech",
+            url: () => "https://api.sarvam.ai/text-to-speech",
             headers: () => ({}),
             _internal: {
                 currentDate: () => testDate,
@@ -132,57 +105,29 @@ describe("doGenerate", () => {
 
         expect(result.response).toMatchObject({
             timestamp: testDate,
-            modelId: "tts-1",
-            headers: {
-                "content-type": "audio/mp3",
-                "x-request-id": "test-request-id",
-                "x-ratelimit-remaining": "123",
-            },
+            modelId: "bulbul:v2",
+        });
+        expect(result.response.headers).toMatchObject({
+            "x-request-id": "test-request-id",
+            "x-ratelimit-remaining": "123",
         });
     });
 
-    it("should use real date when no custom date provider is specified", async () => {
-        prepareAudioResponse();
+    it("should pass output format", async () => {
+        prepareJsonResponse();
 
-        const testDate = new Date(0);
-        const customModel = new SarvamSpeechModel("tts-1", {
-            provider: "test-provider",
-            url: () => "https://api.sarvam.com/v1/audio/speech",
-            headers: () => ({}),
-            _internal: {
-                currentDate: () => testDate,
-            },
-        });
-
-        const result = await customModel.doGenerate({
+        await model.doGenerate({
             text: "Hello from the AI SDK!",
+            outputFormat: "wav",
         });
 
-        expect(result.response.timestamp.getTime()).toEqual(testDate.getTime());
-        expect(result.response.modelId).toBe("tts-1");
-    });
-
-    it("should handle different audio formats", async () => {
-        const formats = ["mp3", "opus", "aac", "flac", "wav", "pcm"] as const;
-
-        for (const format of formats) {
-            const audio = prepareAudioResponse({ format });
-
-            const result = await model.doGenerate({
-                text: "Hello from the AI SDK!",
-                providerOptions: {
-                    sarvam: {
-                        response_format: format,
-                    },
-                },
-            });
-
-            expect(result.audio).toStrictEqual(audio);
-        }
+        expect(await server.calls[0].requestBodyJson).toMatchObject({
+            response_format: "wav",
+        });
     });
 
     it("should include warnings if any are generated", async () => {
-        prepareAudioResponse();
+        prepareJsonResponse();
 
         const result = await model.doGenerate({
             text: "Hello from the AI SDK!",

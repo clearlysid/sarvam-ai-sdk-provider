@@ -1,7 +1,8 @@
 import {
-  LanguageModelV1,
-  LanguageModelV1CallWarning,
-  LanguageModelV1FunctionToolCall,
+  LanguageModelV3FunctionTool,
+  LanguageModelV3ProviderTool,
+  LanguageModelV3ToolChoice,
+  SharedV3Warning,
   UnsupportedFunctionalityError,
 } from "@ai-sdk/provider";
 import { generateId } from "@ai-sdk/provider-utils";
@@ -16,53 +17,39 @@ type SarvamTools = Array<{
 }>;
 
 export function prepareTools({
-  mode,
+  tools,
+  toolChoice,
 }: {
-  mode: Parameters<LanguageModelV1["doGenerate"]>[0]["mode"] & {
-    type: "regular";
-  };
+  tools?: Array<LanguageModelV3FunctionTool | LanguageModelV3ProviderTool>;
+  toolChoice?: LanguageModelV3ToolChoice;
 }): {
-  tools:
-    | undefined
-    | Array<{
-        type: "function";
-        function: {
-          name: string;
-          description: string | undefined;
-          parameters: unknown;
-        };
-      }>;
+  tools: SarvamTools | undefined;
   tool_choice:
     | { type: "function"; function: { name: string } }
     | "auto"
     | "none"
     | "required"
     | undefined;
-  toolWarnings: LanguageModelV1CallWarning[];
-  fakeTools?: string;
+  toolWarnings: SharedV3Warning[];
 } {
-  // when the tools array is empty, change it to undefined to prevent errors:
-  const tools = mode.tools?.length ? mode.tools : undefined;
-  const toolWarnings: LanguageModelV1CallWarning[] = [];
+  const toolWarnings: SharedV3Warning[] = [];
 
-  if (tools == null) {
+  if (!tools?.length) {
     return { tools: undefined, tool_choice: undefined, toolWarnings };
   }
-
-  const toolChoice = mode.toolChoice;
 
   const sarvamTools: SarvamTools = [];
 
   for (const tool of tools) {
-    if (tool.type === "provider-defined") {
-      toolWarnings.push({ type: "unsupported-tool", tool });
+    if (tool.type === "provider") {
+      toolWarnings.push({ type: "unsupported", feature: "provider-defined tool" });
     } else {
       sarvamTools.push({
         type: "function",
         function: {
           name: tool.name,
           description: tool.description,
-          parameters: tool.parameters,
+          parameters: tool.inputSchema,
         },
       });
     }
@@ -99,39 +86,19 @@ export function prepareTools({
   }
 }
 
-import { compile } from "json-schema-to-typescript";
-
-export const simulateToolCalling = async (
+export const simulateToolCalling = (
   tools: SarvamTools,
-): Promise<string> => {
+): string => {
   const context = [];
   const names = [];
 
   for (const tool of tools) {
     names.push(tool.function.name);
-
-    const tsType = await compile(
-      tool.function.parameters as object,
-      tool.function.name,
-      {
-        bannerComment: "",
-        format: false,
-        declareExternallyReferenced: true,
-        enableConstEnums: true,
-        unreachableDefinitions: false,
-        strictIndexSignatures: false,
-      },
-    );
-    const toolContext = tsType
-      .replace(
-        /export interface (\w+) \{/,
-        (_: any, name: string) => `type ${tool.function.name} = {`,
-      )
-      .replace(/\/\*\*\s*\n\s*\*\s*(.*?)\s*\n\s*\*\//, "// $1");
-    context.push(`// ${tool.function.description}\n${toolContext}`);
+    const paramStr = JSON.stringify(tool.function.parameters, null, 2);
+    context.push(`// ${tool.function.description}\n// Parameters: ${paramStr}\ntype ${tool.function.name} = object`);
   }
 
-  const text = `These are the available tool you can execute.
+  return `These are the available tool you can execute.
 
 ${context.join("\n")}
 
@@ -149,13 +116,11 @@ const myChoice: YourToolChoices = {
     "toolName": <name>,
     "toolData": <data>
 }`;
-
-  return text;
 };
 
 export const extractToolCallData = (
   jsonObject: object,
-): LanguageModelV1FunctionToolCall | void => {
+): { toolCallId: string; toolName: string; input: string } | void => {
 
     type ToolFunction = {
       toolName: string;
@@ -167,9 +132,8 @@ export const extractToolCallData = (
     if (!("toolData" in toolFunction)) return;
 
     return {
-        args: JSON.stringify(toolFunction.toolData),
+        input: JSON.stringify(toolFunction.toolData),
         toolCallId: generateId(),
-        toolCallType: "function",
         toolName: toolFunction.toolName,
     };
 

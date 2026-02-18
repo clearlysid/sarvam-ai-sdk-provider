@@ -1,6 +1,6 @@
 import {
-    TranscriptionModelV1,
-    TranscriptionModelV1CallWarning,
+    TranscriptionModelV3,
+    SharedV3Warning,
 } from "@ai-sdk/provider";
 import {
     combineHeaders,
@@ -25,8 +25,8 @@ interface SarvamTranscriptionModelConfig extends SarvamConfig {
     transcription?: SarvamTranscriptionCallOptions;
 }
 
-export class SarvamTranscriptionModel implements TranscriptionModelV1 {
-    readonly specificationVersion = "v1";
+export class SarvamTranscriptionModel implements TranscriptionModelV3 {
+    readonly specificationVersion = "v3";
 
     constructor(
         readonly modelId: SarvamTranscriptionModelId,
@@ -38,19 +38,19 @@ export class SarvamTranscriptionModel implements TranscriptionModelV1 {
         return this.config.provider;
     }
 
-    private getArgs({
+    private async getArgs({
         audio,
         mediaType,
         providerOptions,
-    }: Parameters<TranscriptionModelV1["doGenerate"]>[0]) {
-        const warnings: TranscriptionModelV1CallWarning[] = [];
+    }: Parameters<TranscriptionModelV3["doGenerate"]>[0]) {
+        const warnings: SharedV3Warning[] = [];
 
         if (this.modelId === "saarika:v1" && this.languageCode === "unknown")
             throw new Error(
                 "Language code unknown is not supported for model saarika:v1",
             );
 
-        const sarvamOptions = parseProviderOptions({
+        const sarvamOptions = await parseProviderOptions({
             provider: "sarvam",
             providerOptions: {
                 sarvam: {
@@ -97,11 +97,11 @@ export class SarvamTranscriptionModel implements TranscriptionModelV1 {
     }
 
     async doGenerate(
-        options: Parameters<TranscriptionModelV1["doGenerate"]>[0],
-    ): Promise<Awaited<ReturnType<TranscriptionModelV1["doGenerate"]>>> {
+        options: Parameters<TranscriptionModelV3["doGenerate"]>[0],
+    ): Promise<Awaited<ReturnType<TranscriptionModelV3["doGenerate"]>>> {
         const currentDate =
             this.config._internal?.currentDate?.() ?? new Date();
-        const { formData, warnings } = this.getArgs(options);
+        const { formData, warnings } = await this.getArgs(options);
 
         const {
             value: response,

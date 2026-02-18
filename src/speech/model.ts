@@ -5,15 +5,15 @@ import {
     parseProviderOptions,
     postJsonToApi,
 } from "@ai-sdk/provider-utils";
-import type { SarvamConfig, SarvamLanguageCode } from "./sarvam-config";
-import { sarvamFailedResponseHandler } from "./sarvam-error";
+import type { SarvamConfig, SarvamLanguageCode } from "../shared/config";
+import { sarvamFailedResponseHandler } from "../shared/error";
 import {
     SarvamProviderOptionsSchema,
     SarvamSpeechSettings,
     SpeakerSchema,
     type SarvamSpeechModelId,
-} from "./sarvam-speech-settings";
-import type { SarvamSpeechAPITypes } from "./sarvam-api-types";
+} from "./settings";
+import type { SarvamSpeechAPITypes } from "../shared/api-types";
 import { z } from "zod";
 
 interface SarvamSpeechModelConfig extends SarvamConfig {

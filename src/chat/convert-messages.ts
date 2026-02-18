@@ -2,7 +2,7 @@ import {
   LanguageModelV3Prompt,
   UnsupportedFunctionalityError,
 } from "@ai-sdk/provider";
-import { SarvamChatPrompt } from "./sarvam-api-types";
+import { SarvamChatPrompt } from "../shared/api-types";
 
 export function convertToSarvamChatMessages(
   prompt: LanguageModelV3Prompt,

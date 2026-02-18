@@ -1,5 +1,5 @@
 import { createTestServer } from "@ai-sdk/test-server/with-vitest";
-import { createSarvam } from "./sarvam-provider";
+import { createSarvam } from "../provider";
 
 const provider = createSarvam({ apiKey: "test-api-key" });
 const model = provider.transcription("saarika:v2", "hi-IN");

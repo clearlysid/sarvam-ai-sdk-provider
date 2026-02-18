@@ -20,21 +20,21 @@ import {
   postJsonToApi,
 } from "@ai-sdk/provider-utils";
 import { z } from "zod";
-import { convertToSarvamChatMessages } from "./convert-to-sarvam-chat-messages";
-import { getResponseMetadata } from "./get-response-metadata";
-import { mapSarvamFinishReason } from "./map-sarvam-finish-reason";
-import { SarvamChatModelId, SarvamChatSettings } from "./sarvam-chat-settings";
+import { convertToSarvamChatMessages } from "./convert-messages";
+import { getResponseMetadata } from "../shared/get-response-metadata";
+import { mapSarvamFinishReason } from "../shared/map-finish-reason";
+import { SarvamChatModelId, SarvamChatSettings } from "./settings";
 import {
   sarvamErrorDataSchema,
   sarvamFailedResponseHandler,
-} from "./sarvam-error";
+} from "../shared/error";
 import {
   extractToolCallData,
   parseJSON,
   prepareTools,
   simulateJsonSchema,
   simulateToolCalling,
-} from "./sarvam-prepare-tools";
+} from "./prepare-tools";
 
 type SarvamChatConfig = {
   provider: string;

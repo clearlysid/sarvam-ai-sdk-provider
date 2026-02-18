@@ -1,4 +1,4 @@
-import { convertToSarvamChatMessages } from "./convert-to-sarvam-chat-messages";
+import { convertToSarvamChatMessages } from "./convert-messages";
 
 describe("user messages", () => {
     it("should convert messages with file parts (images)", async () => {

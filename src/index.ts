@@ -1,2 +1,2 @@
-export { createSarvam, sarvam } from "./sarvam-provider";
-export type { SarvamProvider, SarvamProviderSettings } from "./sarvam-provider";
+export { createSarvam, sarvam } from "./provider";
+export type { SarvamProvider, SarvamProviderSettings } from "./provider";

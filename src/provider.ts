@@ -8,23 +8,23 @@ import {
     loadApiKey,
     withoutTrailingSlash,
 } from "@ai-sdk/provider-utils";
-import { SarvamChatLanguageModel } from "./sarvam-chat-language-model";
-import { SarvamChatModelId, SarvamChatSettings } from "./sarvam-chat-settings";
-import { SarvamLanguageCode } from "./sarvam-config";
+import { SarvamChatLanguageModel } from "./chat/model";
+import { SarvamChatModelId, SarvamChatSettings } from "./chat/settings";
+import { SarvamLanguageCode } from "./shared/config";
 import {
     SarvamSpeechModel,
-} from "./sarvam-speech-model";
-import { SarvamSpeechModelId, SarvamSpeechSettings } from "./sarvam-speech-settings";
+} from "./speech/model";
+import { SarvamSpeechModelId, SarvamSpeechSettings } from "./speech/settings";
 import {
     SarvamTranscriptionModel,
-} from "./sarvam-transcription-model";
-import { SarvamSpeechTranslationModelId, SarvamTranscriptionCallOptions, SarvamTranscriptionModelId } from "./sarvam-transcription-settings";
-import { SarvamTranslationModel } from "./sarvam-translation-model";
-import { SarvamTranslationSettings } from "./sarvam-translation-settings";
-import { SarvamTransliterateModel } from "./sarvam-transliterate-model";
-import { SarvamTransliterateSettings } from "./sarvam-transliterate-settings";
-import { SarvamLidModel } from "./sarvam-lid-model";
-import { SarvamSpeechTranslationModel } from "./sarvam-speech-translation-model";
+} from "./transcription/model";
+import { SarvamSpeechTranslationModelId, SarvamTranscriptionCallOptions, SarvamTranscriptionModelId } from "./transcription/settings";
+import { SarvamTranslationModel } from "./translation/model";
+import { SarvamTranslationSettings } from "./translation/settings";
+import { SarvamTransliterateModel } from "./transliteration/model";
+import { SarvamTransliterateSettings } from "./transliteration/settings";
+import { SarvamLidModel } from "./lid/model";
+import { SarvamSpeechTranslationModel } from "./transcription/speech-translation-model";
 
 export interface SarvamProvider {
   /**

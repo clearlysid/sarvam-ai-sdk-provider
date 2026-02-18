@@ -12,33 +12,37 @@ import {
     postJsonToApi
 } from "@ai-sdk/provider-utils";
 import { z } from "zod";
-import { convertToSarvamChatMessages } from "./convert-to-sarvam-chat-messages";
-import { SarvamLanguageCodeSchema, SarvamScriptCodeSchema } from "./sarvam-config";
-import { mapSarvamFinishReason } from "./map-sarvam-finish-reason";
+import { convertToSarvamChatMessages } from "../chat/convert-messages";
+import { SarvamLanguageCodeSchema } from "../shared/config";
+import { mapSarvamFinishReason } from "../shared/map-finish-reason";
 import {
     sarvamFailedResponseHandler
-} from "./sarvam-error";
+} from "../shared/error";
+import { SarvamTranslationSettings } from "./settings";
 
-type SarvamLidConfig = {
+type SarvamTranslationConfig = {
   provider: string;
   headers: () => Record<string, string | undefined>;
   url: (options: { path: string }) => string;
   fetch?: FetchFunction;
 };
 
-export class SarvamLidModel implements LanguageModelV3 {
+export class SarvamTranslationModel implements LanguageModelV3 {
   readonly specificationVersion = "v3";
 
   readonly supportedUrls: Record<string, RegExp[]> = {};
 
-  readonly modelId: "unknown";
+  readonly modelId: NonNullable<SarvamTranslationSettings["model"]>
+  readonly settings: SarvamTranslationSettings;
 
-  private readonly config: SarvamLidConfig;
+  private readonly config: SarvamTranslationConfig;
 
   constructor(
-    config: SarvamLidConfig,
+    settings: SarvamTranslationSettings,
+    config: SarvamTranslationConfig,
   ) {
-    this.modelId = "unknown";
+    this.modelId = settings.model ?? "mayura:v1";
+    this.settings = settings;
     this.config = config;
   }
 
@@ -53,6 +57,23 @@ export class SarvamLidModel implements LanguageModelV3 {
   }) {
     const warnings: SharedV3Warning[] = [];
 
+    if (this.settings.from === this.settings.to) {
+        throw new Error(
+        "Source and target languages code must be different.",
+        );
+    }
+
+    if (this.modelId === "sarvam-translate:v1") {
+        if ((this.settings.mode ?? "formal") !== "formal")
+            throw new Error(
+            "Sarvam 'sarvam-translate:v1' only support mode formal.",
+            );
+        if ((this.settings.from ?? "auto") === "auto")
+            throw new Error(
+            "Sarvam 'sarvam-translate:v1' requires source language code.",
+            );
+    }
+
     const messages = convertToSarvamChatMessages(prompt);
 
     return {
@@ -62,6 +83,14 @@ export class SarvamLidModel implements LanguageModelV3 {
           .filter((m) => m.role === "user")
           .map((m) => m.content)
           .join("\n"),
+        source_language_code: this.settings.from ?? "auto",
+        target_language_code: this.settings.to,
+        numerals_format: this.settings.numerals_format ?? "international",
+        enable_preprocessing: this.settings.enable_preprocessing ?? false,
+        output_script: this.settings.output_script ?? null,
+        speaker_gender: this.settings.speaker_gender ?? "Male",
+        mode: this.settings.mode ?? "formal",
+        model: this.modelId,
       },
       warnings,
     };
@@ -82,19 +111,19 @@ export class SarvamLidModel implements LanguageModelV3 {
       value: response,
     } = await postJsonToApi({
       url: this.config.url({
-        path: "/text-lid",
+        path: "/translate",
       }),
       headers: combineHeaders(this.config.headers(), options.headers),
       body: args,
       failedResponseHandler: sarvamFailedResponseHandler,
       successfulResponseHandler: createJsonResponseHandler(
-        sarvamLidResponseSchema,
+        sarvamTranslationResponseSchema,
       ),
       abortSignal: options.abortSignal,
       fetch: this.config.fetch,
     });
 
-    const text = response.language_code ?? undefined;
+    const text = response.translated_text ?? undefined;
     const content: LanguageModelV3Content[] = [];
     if (text) {
       content.push({ type: "text", text });
@@ -118,12 +147,12 @@ export class SarvamLidModel implements LanguageModelV3 {
   async doStream(
     _options: LanguageModelV3CallOptions,
   ): Promise<never> {
-    throw new Error("Language Identification feature doesn't support streaming yet");
+    throw new Error("Translation feature doesn't support streaming yet");
   }
 }
 
-const sarvamLidResponseSchema = z.object({
-  script_code: SarvamScriptCodeSchema.nullish(),
-  language_code: SarvamLanguageCodeSchema.nullable(),
+const sarvamTranslationResponseSchema = z.object({
+  translated_text: z.string().nullish(),
+  source_language_code: SarvamLanguageCodeSchema.nullable(),
   request_id: z.string().nullish(),
 });

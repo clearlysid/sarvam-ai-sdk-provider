@@ -1,11 +1,10 @@
 # AI SDK - Sarvam Provider
 
-The **[Sarvam provider](https://ai-sdk.dev/providers/community-providers/sarvam)** for the [AI SDK](https://ai-sdk.dev/docs)
-contains language model support for the Sarvam chat completion, Text-to-Speech and Speech-to-Text APIs.
+The **[Sarvam provider](https://ai-sdk.dev/providers/community-providers/sarvam)** for the [AI SDK](https://ai-sdk.dev/docs) contains language model support for the [Sarvam AI](https://sarvam.ai) chat, text-to-speech, speech-to-text, translation, transliteration, and language identification APIs.
 
 ## Setup
 
-The **[Sarvam](http://sarvam.ai)** provider is available in the `sarvam-ai-sdk` module. You can install it with
+The Sarvam provider is available in the `sarvam-ai-sdk` module. You can install it with
 
 ```bash
 npm i sarvam-ai-sdk
@@ -16,186 +15,39 @@ npm i sarvam-ai-sdk
 You can import the default provider instance `sarvam` from `sarvam-ai-sdk`:
 
 ```ts
-import { sarvam } from 'sarvam-ai-sdk';
+import { sarvam } from "sarvam-ai-sdk";
 ```
 
-Create `.env` file with API key from **[Sarvam Dashboard](https://dashboard.sarvam.ai/)**
+Set your API key from the **[Sarvam Dashboard](https://dashboard.sarvam.ai/)**:
+
 ```bash
 SARVAM_API_KEY="your_api_key"
 ```
 
+## Supported Models
+
+| API | Model IDs | Method |
+|-----|-----------|--------|
+| Chat | `sarvam-m` | `sarvam("sarvam-m")` |
+| Text-to-Speech | `bulbul:v2`, `bulbul:v3` | `sarvam.speech("bulbul:v3", "hi-IN")` |
+| Speech-to-Text | `saarika:v2.5`, `saaras:v3` | `sarvam.transcription("saarika:v2.5", "hi-IN")` |
+| Speech Translation | `saaras:v2.5` | `sarvam.speechTranslation("saaras:v2.5")` |
+| Translation | `mayura:v1`, `sarvam-translate:v1` | `sarvam.translation({ from: "hi-IN", to: "en-IN" })` |
+| Transliteration | - | `sarvam.transliterate({ from: "en-IN", to: "hi-IN" })` |
+| Language ID | - | `sarvam.languageIdentification()` |
+
 ## Example
 
 ```ts
-import { sarvam } from 'sarvam-ai-sdk';
-import { generateText } from 'ai';
+import { sarvam } from "sarvam-ai-sdk";
+import { generateText } from "ai";
 
 const { text } = await generateText({
-    model: sarvam("sarvam-m"),
-    prompt: "Translate this to malayalam: 'Keep cooking, guys'",
+  model: sarvam("sarvam-m"),
+  prompt: "Translate this to Malayalam: 'Keep cooking, guys'",
 });
 
-console.log(text); // പാചകം തുടരൂ, സുഹൃത്തുക്കളേ
-```
-
-## Text-to-Speech
-
-```ts
-import { sarvam } from "sarvam-ai-sdk";
-import { experimental_generateSpeech as generateSpeech } from "ai";
-import { writeFile } from "fs/promises";
-
-const { audio } = await generateSpeech({
-    model: sarvam.speech("bulbul:v2", "ml-IN"),
-    text: "പാചകം തുടരൂ, സുഹൃത്തുക്കളേ",
-});
-
-const audioBuffer = Buffer.from(audio.base64, "base64")
-await writeFile("./src/transcript-test.wav", audioBuffer);
-```
-
-## Speech-to-Text
-
-```ts
-import { sarvam } from "sarvam-ai-sdk";
-import { experimental_transcribe as transcribe } from "ai";
-import { readFile } from "fs/promises";
-
-const { text } = await transcribe({
-    model: sarvam.transcription("saarika:v2", "ml-IN")
-    audio: await readFile("./src/transcript-test.wav"),
-});
-
-console.log(text); // പാചകം തുടരും സുഹൃത്തുക്കളെ
-```
-
-## Speech-to-Text-Translate
-
-```ts
-import { sarvam } from "sarvam-ai-sdk";
-import { experimental_transcribe as transcribe } from "ai";
-import { readFile } from "fs/promises";
-
-const result = await transcribe({
-    model: sarvam.speechTranslation("saaras:v2"),
-    audio: await readFile("./src/transcript-test.wav"),
-});
-
-console.log(result.text); // Cooking continues, my friends
-```
-
-## Translation
-
-> NB: Only transliterates `prompt` and `role:user` messages, not `system` not `assistant`.
-
-```ts
-import { sarvam } from "sarvam-ai-sdk";
-import { generateText } from "ai";
-
-const result = await generateText({
-    model: sarvam.translation({
-        "from": "ml-IN",
-        "to": "en-IN",
-    }),
-    prompt: "ഇതൊക്കെ ശ്രദ്ധിക്കണ്ടേ അംബാനെ?",
-});
-
-console.log(result.text); // Shouldn't we be careful about this, Ambane?
-```
-
-## Transliterate
-
-> NB: Only transliterates `prompt` and `role:user` messages, not `system` not `assistant`.
-
-```ts
-import { sarvam } from "sarvam-ai-sdk";
-import { generateText } from "ai";
-
-const result = await generateText({
-  model: sarvam.transliterate({
-      from: "en-IN",
-      to: "ml-IN",
-  }),
-  prompt: "eda mone, happy alle?",
-});
-
-console.log(result.text); // എടാ മോനെ, ഹാപ്പി അല്ലേ?
-```
-
-## Language Identification
-
-> NB: Only identifies `prompt` and `role:user` messages, not `system` not `assistant`.
-
-```ts
-import { sarvam } from "sarvam-ai-sdk";
-import { generateText } from "ai";
-
-const result = await generateText({
-    model: sarvam.languageIdentification(),
-    prompt: "ബുദ്ധിയാണ് സാറേ ഇവൻ്റെ മെയിൻ",
-});
-
-console.log(result.text); // ml-IN
-```
-
-## Tool Calling
-
-> [!WARNING]
-> Latest `sarvam-m` model isn't trained on native tool calling feature (aka JSON mode). So we simulate this with prompt engineering technique.
-
-```ts
-import { z } from "zod";
-import { generateText, tool } from "ai";
-import { sarvam } from "sarvam-ai-sdk";
-
-
-const result = await generateText({
-  model: sarvam("sarvam-m", {
-    simulate: "tool-calling" // ⚠️ important
-  }),
-  tools: {
-    weather: tool({
-      description: "Get the weather in a location",
-      parameters: z.object({
-        location: z.string().describe("The location to get the weather for"),
-      }),
-      execute: async ({ location }) => ({
-        location,
-        temperature: 72 + Math.floor(Math.random() * 21) - 10,
-      }),
-    }),
-  },
-  system: "Your are a helpful AI",
-  prompt: "കൊച്ചിയിലെ കാലാവസ്ഥ എന്താണ്?",
-});
-
-console.log(result.toolResults);
-```
-## Generate JSON object
-
-> [!WARNING]
-> Latest `sarvam-m` model isn't trained on native JSON object generation. So we simulate this with prompt engineering technique.
-
-```ts
-import { z } from "zod";
-import { sarvam } from "sarvam-ai-sdk";
-import { generateObject } from 'ai';
-
-const { object } = await generateObject({
-  model: sarvam("sarvam-m", {
-    simulate: "json-object" // ⚠️ important
-  }),
-  schema: z.object({
-    recipe: z.object({
-      name: z.string(),
-      ingredients: z.array(z.string()),
-      steps: z.array(z.string()),
-    }),
-  }),
-  prompt: 'Generate a South Indian recipe, in Malayalam',
-});
-
-console.log(object);
+console.log(text);
 ```
 
 ## Documentation

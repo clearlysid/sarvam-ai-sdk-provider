@@ -124,7 +124,7 @@ export const extractToolCallData = (
 
     type ToolFunction = {
       toolName: string;
-      toolData: any;
+      toolData: unknown;
     };
     const toolFunction = jsonObject as ToolFunction
 

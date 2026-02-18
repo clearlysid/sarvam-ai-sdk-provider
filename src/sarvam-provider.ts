@@ -1,7 +1,7 @@
 import {
-    LanguageModelV1,
-    SpeechModelV1,
-    TranscriptionModelV1
+    LanguageModelV3,
+    SpeechModelV3,
+    TranscriptionModelV3
 } from "@ai-sdk/provider";
 import {
     FetchFunction,
@@ -30,7 +30,7 @@ export interface SarvamProvider {
   /**
   * Creates a model for text generation.
   */
-  (modelId: SarvamChatModelId, settings?: SarvamChatSettings): LanguageModelV1;
+  (modelId: SarvamChatModelId, settings?: SarvamChatSettings): LanguageModelV3;
 
   /**
   * Creates an Sarvam chat model for text generation.
@@ -38,7 +38,7 @@ export interface SarvamProvider {
   languageModel(
     modelId: SarvamChatModelId,
     settings?: SarvamChatSettings,
-  ): LanguageModelV1;
+  ): LanguageModelV3;
 
   /**
   * Creates a Sarvam model for transcription.
@@ -52,14 +52,14 @@ export interface SarvamProvider {
     */
     languageCode?: SarvamLanguageCode | "unknown",
     settings?: SarvamTranscriptionCallOptions,
-  ): TranscriptionModelV1;
+  ): TranscriptionModelV3;
 
   /**
   * Creates a Sarvam model for Speech translation.
   */
   speechTranslation(
     modelId: SarvamSpeechTranslationModelId,
-  ): TranscriptionModelV1;
+  ): TranscriptionModelV3;
 
   /**
   * Creates a Sarvam model for speech.
@@ -68,22 +68,22 @@ export interface SarvamProvider {
     modelId: SarvamSpeechModelId,
     languageCode: SarvamLanguageCode,
     settings?: SarvamSpeechSettings,
-  ): SpeechModelV1;
+  ): SpeechModelV3;
 
   /**
   * Creates an Sarvam model for transliterate.
   */
-  transliterate(settings: SarvamTransliterateSettings): LanguageModelV1;
+  transliterate(settings: SarvamTransliterateSettings): LanguageModelV3;
 
   /**
   * Creates an Sarvam model for translation.
   */
-  translation(settings: SarvamTranslationSettings): LanguageModelV1;
+  translation(settings: SarvamTranslationSettings): LanguageModelV3;
 
   /**
   * Creates an Sarvam model for language identification.
   */
-  languageIdentification(): LanguageModelV1;
+  languageIdentification(): LanguageModelV3;
 }
 
 export interface SarvamProviderSettings {

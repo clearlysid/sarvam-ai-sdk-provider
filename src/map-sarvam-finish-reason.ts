@@ -1,19 +1,19 @@
-import { LanguageModelV1FinishReason } from "@ai-sdk/provider";
+import { LanguageModelV3FinishReason } from "@ai-sdk/provider";
 
 export function mapSarvamFinishReason(
     finishReason: string | null | undefined,
-): LanguageModelV1FinishReason {
+): LanguageModelV3FinishReason {
     switch (finishReason) {
         case "stop":
-            return "stop";
+            return { unified: "stop", raw: finishReason };
         case "length":
-            return "length";
+            return { unified: "length", raw: finishReason };
         case "content_filter":
-            return "content-filter";
+            return { unified: "content-filter", raw: finishReason };
         case "function_call":
         case "tool_calls":
-            return "tool-calls";
+            return { unified: "tool-calls", raw: finishReason };
         default:
-            return "unknown";
+            return { unified: "other", raw: finishReason ?? undefined };
     }
 }

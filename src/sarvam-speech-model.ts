@@ -1,7 +1,6 @@
-import type { SpeechModelV1, SpeechModelV1CallWarning } from "@ai-sdk/provider";
+import type { SpeechModelV3, SharedV3Warning } from "@ai-sdk/provider";
 import {
     combineHeaders,
-    createBinaryResponseHandler,
     createJsonResponseHandler,
     parseProviderOptions,
     postJsonToApi,
@@ -24,8 +23,12 @@ interface SarvamSpeechModelConfig extends SarvamConfig {
     speech?: SarvamSpeechSettings;
 }
 
-export class SarvamSpeechModel implements SpeechModelV1 {
-    readonly specificationVersion = "v1";
+type SarvamSpeechCallOptions = {
+    speaker: z.infer<typeof SpeakerSchema>;
+};
+
+export class SarvamSpeechModel implements SpeechModelV3 {
+    readonly specificationVersion = "v3";
 
     get provider(): string {
         return this.config.provider;
@@ -37,18 +40,15 @@ export class SarvamSpeechModel implements SpeechModelV1 {
         private readonly config: SarvamSpeechModelConfig,
     ) {}
 
-    private getArgs({
+    private async getArgs({
         text,
         voice,
         outputFormat = "wav",
-        // speed,
-        // instructions,
         providerOptions,
-    }: Parameters<SpeechModelV1["doGenerate"]>[0]) {
-        const warnings: SpeechModelV1CallWarning[] = [];
+    }: Parameters<SpeechModelV3["doGenerate"]>[0]) {
+        const warnings: SharedV3Warning[] = [];
 
-        // Parse provider options
-        const sarvamOptions = parseProviderOptions({
+        const sarvamOptions = await parseProviderOptions({
             provider: "sarvam",
             providerOptions: {
                 sarvam: {
@@ -75,15 +75,11 @@ export class SarvamSpeechModel implements SpeechModelV1 {
             return "meera";
         };
 
-        // Create request body
         const requestBody: Record<string, unknown> = {
             model: this.modelId,
             text: text,
             target_language_code: this.languageCode,
             speaker: getSpeaker(),
-            // response_format: "wav",
-            // speed,
-            // instructions,
         };
 
         if (outputFormat) {
@@ -95,14 +91,13 @@ export class SarvamSpeechModel implements SpeechModelV1 {
                 requestBody.response_format = outputFormat;
             } else {
                 warnings.push({
-                    type: "unsupported-setting",
-                    setting: "outputFormat",
+                    type: "unsupported",
+                    feature: "outputFormat",
                     details: `Unsupported output format: ${outputFormat}. Using mp3 instead.`,
                 });
             }
         }
 
-        // Add provider-specific options
         if (sarvamOptions) {
             const speechModelOptions: SarvamSpeechAPITypes = {};
 
@@ -122,11 +117,11 @@ export class SarvamSpeechModel implements SpeechModelV1 {
     }
 
     async doGenerate(
-        options: Parameters<SpeechModelV1["doGenerate"]>[0],
-    ): Promise<Awaited<ReturnType<SpeechModelV1["doGenerate"]>>> {
+        options: Parameters<SpeechModelV3["doGenerate"]>[0],
+    ): Promise<Awaited<ReturnType<SpeechModelV3["doGenerate"]>>> {
         const currentDate =
             this.config._internal?.currentDate?.() ?? new Date();
-        const { requestBody, warnings } = this.getArgs(options);
+        const { requestBody, warnings } = await this.getArgs(options);
 
         const {
             value,

@@ -1,4 +1,4 @@
-import { SarvamLanguageCode } from "./sarvam-config";
+import { SarvamLanguageCode } from "../shared/config";
 
 export interface SarvamTransliterateSettings {
     /**

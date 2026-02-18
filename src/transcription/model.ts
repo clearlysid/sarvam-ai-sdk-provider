@@ -9,13 +9,13 @@ import {
     postFormDataToApi,
 } from "@ai-sdk/provider-utils";
 import { z } from "zod";
-import { SarvamConfig, SarvamLanguageCode } from "./sarvam-config";
-import { sarvamFailedResponseHandler } from "./sarvam-error";
+import { SarvamConfig, SarvamLanguageCode } from "../shared/config";
+import { sarvamFailedResponseHandler } from "../shared/error";
 import {
     SarvamProviderOptionsSchema,
     SarvamTranscriptionCallOptions,
     SarvamTranscriptionModelId,
-} from "./sarvam-transcription-settings";
+} from "./settings";
 
 // https://docs.sarvam.ai/api-reference-docs/speech-to-text/transcribe
 interface SarvamTranscriptionModelConfig extends SarvamConfig {

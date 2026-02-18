@@ -1,6 +1,6 @@
 import { createTestServer } from "@ai-sdk/test-server/with-vitest";
-import { SarvamSpeechModel } from "./sarvam-speech-model";
-import { createSarvam } from "./sarvam-provider";
+import { SarvamSpeechModel } from "./model";
+import { createSarvam } from "../provider";
 
 const provider = createSarvam({ apiKey: "test-api-key" });
 const model = provider.speech("bulbul:v2", "hi-IN");

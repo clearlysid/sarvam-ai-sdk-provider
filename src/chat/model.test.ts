@@ -1,7 +1,7 @@
 import { LanguageModelV3Prompt } from "@ai-sdk/provider";
 import { convertReadableStreamToArray } from "@ai-sdk/provider-utils/test";
 import { createTestServer } from "@ai-sdk/test-server/with-vitest";
-import { createSarvam } from "./sarvam-provider";
+import { createSarvam } from "../provider";
 
 const TEST_PROMPT: LanguageModelV3Prompt = [
     { role: "user", content: [{ type: "text", text: "Hello" }] },

@@ -1,6 +1,6 @@
-import { SarvamLanguageCode } from "./sarvam-config";
-import { SarvamSpeechVoices } from "./sarvam-speech-settings";
-import { SarvamTranscriptionModelId } from "./sarvam-transcription-settings";
+import { SarvamLanguageCode } from "./config";
+import { SarvamSpeechVoices } from "../speech/settings";
+import { SarvamTranscriptionModelId } from "../transcription/settings";
 
 export type SarvamChatPrompt = Array<SarvamMessage>;
 

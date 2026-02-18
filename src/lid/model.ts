@@ -12,37 +12,33 @@ import {
     postJsonToApi
 } from "@ai-sdk/provider-utils";
 import { z } from "zod";
-import { convertToSarvamChatMessages } from "./convert-to-sarvam-chat-messages";
-import { SarvamLanguageCodeSchema } from "./sarvam-config";
-import { mapSarvamFinishReason } from "./map-sarvam-finish-reason";
+import { convertToSarvamChatMessages } from "../chat/convert-messages";
+import { SarvamLanguageCodeSchema, SarvamScriptCodeSchema } from "../shared/config";
+import { mapSarvamFinishReason } from "../shared/map-finish-reason";
 import {
     sarvamFailedResponseHandler
-} from "./sarvam-error";
-import { SarvamTransliterateSettings } from "./sarvam-transliterate-settings";
+} from "../shared/error";
 
-type SarvamTransliterateConfig = {
+type SarvamLidConfig = {
   provider: string;
   headers: () => Record<string, string | undefined>;
   url: (options: { path: string }) => string;
   fetch?: FetchFunction;
 };
 
-export class SarvamTransliterateModel implements LanguageModelV3 {
+export class SarvamLidModel implements LanguageModelV3 {
   readonly specificationVersion = "v3";
 
   readonly supportedUrls: Record<string, RegExp[]> = {};
 
   readonly modelId: "unknown";
-  readonly settings: SarvamTransliterateSettings;
 
-  private readonly config: SarvamTransliterateConfig;
+  private readonly config: SarvamLidConfig;
 
   constructor(
-    settings: SarvamTransliterateSettings,
-    config: SarvamTransliterateConfig,
+    config: SarvamLidConfig,
   ) {
     this.modelId = "unknown";
-    this.settings = settings;
     this.config = config;
   }
 
@@ -57,13 +53,6 @@ export class SarvamTransliterateModel implements LanguageModelV3 {
   }) {
     const warnings: SharedV3Warning[] = [];
 
-    if (this.settings.from !== "auto") {
-      if (this.settings.to !== "en-IN" && this.settings.from !== "en-IN")
-        throw new Error(
-          "Sarvam doesn't support Indic-Indic Transliteration yet",
-        );
-    }
-
     const messages = convertToSarvamChatMessages(prompt);
 
     return {
@@ -73,16 +62,6 @@ export class SarvamTransliterateModel implements LanguageModelV3 {
           .filter((m) => m.role === "user")
           .map((m) => m.content)
           .join("\n"),
-        source_language_code: this.settings.from ?? "auto",
-        target_language_code: this.settings.to,
-        numerals_format: this.settings.numerals_format ?? "international",
-        ...(this.settings.spoken_form
-          ? {
-              spoken_form: this.settings.spoken_form,
-              spoken_form_numerals_language:
-                this.settings.spoken_form_numerals_language ?? "english",
-            }
-          : {}),
       },
       warnings,
     };
@@ -103,19 +82,19 @@ export class SarvamTransliterateModel implements LanguageModelV3 {
       value: response,
     } = await postJsonToApi({
       url: this.config.url({
-        path: "/transliterate",
+        path: "/text-lid",
       }),
       headers: combineHeaders(this.config.headers(), options.headers),
       body: args,
       failedResponseHandler: sarvamFailedResponseHandler,
       successfulResponseHandler: createJsonResponseHandler(
-        sarvamTransliterateResponseSchema,
+        sarvamLidResponseSchema,
       ),
       abortSignal: options.abortSignal,
       fetch: this.config.fetch,
     });
 
-    const text = response.transliterated_text ?? undefined;
+    const text = response.language_code ?? undefined;
     const content: LanguageModelV3Content[] = [];
     if (text) {
       content.push({ type: "text", text });
@@ -139,12 +118,12 @@ export class SarvamTransliterateModel implements LanguageModelV3 {
   async doStream(
     _options: LanguageModelV3CallOptions,
   ): Promise<never> {
-    throw new Error("Transliterate feature doesn't support streaming yet");
+    throw new Error("Language Identification feature doesn't support streaming yet");
   }
 }
 
-const sarvamTransliterateResponseSchema = z.object({
-  transliterated_text: z.string().nullish(),
-  source_language_code: SarvamLanguageCodeSchema.nullable(),
+const sarvamLidResponseSchema = z.object({
+  script_code: SarvamScriptCodeSchema.nullish(),
+  language_code: SarvamLanguageCodeSchema.nullable(),
   request_id: z.string().nullish(),
 });

@@ -8,9 +8,9 @@ import {
   postFormDataToApi,
 } from "@ai-sdk/provider-utils";
 import { z } from "zod";
-import { SarvamConfig } from "./sarvam-config";
-import { sarvamFailedResponseHandler } from "./sarvam-error";
-import { SarvamSpeechTranslationModelId } from "./sarvam-transcription-settings";
+import { SarvamConfig } from "../shared/config";
+import { sarvamFailedResponseHandler } from "../shared/error";
+import { SarvamSpeechTranslationModelId } from "./settings";
 
 // https://docs.sarvam.ai/api-reference-docs/speech-to-text/transcribe
 interface SarvamSpeechTranslationModelConfig extends SarvamConfig {

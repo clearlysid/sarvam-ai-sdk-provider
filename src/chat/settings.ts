@@ -1,4 +1,4 @@
-// https://console.sarvam.com/docs/models
+// https://docs.sarvam.ai/api-reference-docs
 export type SarvamChatModelId =
   // production models
   "sarvam-m" | (string & {});
@@ -40,4 +40,14 @@ export interface SarvamChatSettings {
    * @default false
    */
   downloadImages?: boolean;
+
+  /**
+   * Controls reasoning effort for sarvam-m.
+   */
+  reasoning_effort?: "low" | "medium" | "high";
+
+  /**
+   * Enable grounding with Wikipedia knowledge.
+   */
+  wiki_grounding?: boolean;
 }

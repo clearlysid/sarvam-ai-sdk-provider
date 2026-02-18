@@ -45,11 +45,6 @@ export class SarvamTranscriptionModel implements TranscriptionModelV3 {
     }: Parameters<TranscriptionModelV3["doGenerate"]>[0]) {
         const warnings: SharedV3Warning[] = [];
 
-        if (this.modelId === "saarika:v1" && this.languageCode === "unknown")
-            throw new Error(
-                "Language code unknown is not supported for model saarika:v1",
-            );
-
         const sarvamOptions = await parseProviderOptions({
             provider: "sarvam",
             providerOptions: {
@@ -87,6 +82,9 @@ export class SarvamTranscriptionModel implements TranscriptionModelV3 {
                     "num_speakers",
                     sarvamOptions.num_speakers.toString(),
                 );
+            }
+            if (sarvamOptions.mode) {
+                formData.append("mode", sarvamOptions.mode);
             }
         }
 

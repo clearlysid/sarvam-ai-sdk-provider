@@ -1,0 +1,86 @@
+name: Auto-fix SDK Drift
+
+on:
+  issues:
+    types: [labeled]
+  workflow_dispatch:
+
+jobs:
+  fix:
+    if: |
+      (github.event_name == 'workflow_dispatch') ||
+      (github.event.label.name == 'auto-update')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - run: pnpm install
+
+      # Bump deps before Claude runs so it sees the new types
+      - name: Bump deps
+        run: |
+          pnpm add -D sarvamai@latest
+          pnpm add @ai-sdk/provider@latest @ai-sdk/provider-utils@latest
+
+      # Capture drift for Claude's prompt
+      - name: Capture drift context
+        id: context
+        run: |
+          set +e
+          SYNC=$(pnpm exec tsx scripts/sync-models.ts 2>&1) || true
+          TSC=$(pnpm run type-check 2>&1) || true
+          echo "sync<<EOF" >> $GITHUB_OUTPUT
+          echo "$SYNC" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          echo "tsc<<EOF" >> $GITHUB_OUTPUT
+          echo "$TSC" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      # Setup: install Claude GitHub app + add ANTHROPIC_API_KEY as repo secret
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            This repo is a Vercel AI SDK provider for Sarvam AI.
+            Dependencies (sarvamai, @ai-sdk/provider, @ai-sdk/provider-utils) were just bumped to latest.
+
+            ## Current issues
+
+            ### Model sync drift (scripts/sync-models.ts output):
+            ${{ steps.context.outputs.sync }}
+
+            ### TypeScript errors (tsc --noEmit):
+            ${{ steps.context.outputs.tsc }}
+
+            ## Instructions
+            1. Fix ALL type errors from @ai-sdk/provider interface changes
+            2. Add missing model IDs, voices, or languages to match the sarvamai SDK
+            3. Remove extras no longer in the SDK
+            4. Update settings types if the sarvamai SDK added new params
+            5. Keep changes minimal — only fix what's broken or drifted
+            6. Do NOT modify tests, README, or package.json
+            7. Verify with: pnpm run type-check && pnpm run sync-models
+
+            ## Codebase layout
+            - src/provider.ts — main provider factory
+            - src/chat/ — chat model (model.ts, settings.ts, prepare-tools.ts, convert-messages.ts)
+            - src/speech/ — TTS model (model.ts, settings.ts)
+            - src/transcription/ — STT model (model.ts, settings.ts, speech-translation-model.ts)
+            - src/translation/ — translation model (model.ts, settings.ts)
+            - src/transliteration/ — transliteration model (model.ts, settings.ts)
+            - src/lid/ — language ID model (model.ts)
+            - src/shared/ — config.ts (language/script enums), api-types.ts, error.ts
+          claude_args: "--model claude-sonnet-4-6 --max-turns 15"

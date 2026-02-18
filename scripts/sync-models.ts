@@ -37,6 +37,8 @@ function extractStringType(filename: string): string[] {
   }
 }
 
+let hasDrift = false;
+
 function diff(label: string, sdk: string[], provider: string[]) {
   const sdkSet = new Set(sdk);
   const provSet = new Set(provider);
@@ -47,6 +49,7 @@ function diff(label: string, sdk: string[], provider: string[]) {
     console.log(`  ${label}: in sync`);
     return;
   }
+  hasDrift = true;
   if (missing.length > 0) {
     console.log(`  ${label} — missing from provider: ${missing.join(", ")}`);
   }
@@ -99,3 +102,4 @@ diff(
 );
 
 console.log("\nDone.");
+process.exit(hasDrift ? 1 : 0);
